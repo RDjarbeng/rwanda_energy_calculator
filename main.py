@@ -5,10 +5,12 @@ VAT = 0.18
 TIER_1, TIER_2, TIER_3 = 89, 212, 249
 TIER_1_LIMIT, TIER_2_LIMIT = 15, 35
 
-def calculateAmountFromUnits(units: float) -> tuple[float, dict]:
+def calculateAmountFromUnits(units: float, initial_amount: float = 0) -> tuple[float, dict]:
     """Calculate amount and return detailed breakdown"""
     if units < 0:
         raise ValueError("Units cannot be negative")
+    if initial_amount < 0:
+        raise ValueError("Initial amount cannot be negative")
     
     # Calculate tier usage
     t1 = units if units <= TIER_1_LIMIT else TIER_1_LIMIT
@@ -23,6 +25,9 @@ def calculateAmountFromUnits(units: float) -> tuple[float, dict]:
     vat_amount = subtotal * VAT
     total = subtotal + vat_amount
     
+    # Calculate remaining amount after initial payment
+    remaining_amount = max(0, total - initial_amount)
+    
     breakdown = {
         'tier1_units': t1,
         'tier2_units': t2,
@@ -32,7 +37,9 @@ def calculateAmountFromUnits(units: float) -> tuple[float, dict]:
         'tier3_cost': t3_cost,
         'subtotal': subtotal,
         'vat_amount': vat_amount,
-        'total': round(total, 2)
+        'total': round(total, 2),
+        'initial_amount': initial_amount,
+        'remaining_amount': round(remaining_amount, 2)
     }
     
     return round(total, 2), breakdown
@@ -91,108 +98,160 @@ app, rt = fast_app(pico=True, tailwind=False)
 
 def create_breakdown_table(breakdown: dict, is_from_units: bool = True):
     """Create a detailed breakdown table"""
-    return Article(
-        H4("Tier Breakdown"),
-        Table(
-            Thead(
-                Tr(
-                    Th("Tier"),
-                    Th("Rate (RWF/kWh)"),
-                    Th("Units Used"),
-                    Th("Cost (RWF)")
-                )
-            ),
-            Tbody(
-                Tr(
-                    Td("Tier 1 (0-15 kWh)"),
-                    Td(f"{TIER_1}"),
-                    Td(f"{breakdown['tier1_units']:.2f}"),
-                    Td(f"{breakdown['tier1_cost']:.2f}")
-                ) if breakdown['tier1_units'] > 0 else None,
-                Tr(
-                    Td("Tier 2 (15-35 kWh)"),
-                    Td(f"{TIER_2}"),
-                    Td(f"{breakdown['tier2_units']:.2f}"),
-                    Td(f"{breakdown['tier2_cost']:.2f}")
-                ) if breakdown['tier2_units'] > 0 else None,
-                Tr(
-                    Td("Tier 3 (35+ kWh)"),
-                    Td(f"{TIER_3}"),
-                    Td(f"{breakdown['tier3_units']:.2f}"),
-                    Td(f"{breakdown['tier3_cost']:.2f}")
-                ) if breakdown['tier3_units'] > 0 else None,
-                Tr(
-                    Td(Strong("Subtotal")),
-                    Td(""),
-                    Td(""),
-                    Td(Strong(f"{breakdown['subtotal']:.2f}"))
+    table_content = [
+        Article(
+            H4("Tier Breakdown"),
+            Table(
+                Thead(
+                    Tr(
+                        Th("Tier"),
+                        Th("Rate (RWF/kWh)"),
+                        Th("Units Used"),
+                        Th("Cost (RWF)")
+                    )
                 ),
-                Tr(
-                    Td(f"VAT ({VAT*100}%)"),
-                    Td(""),
-                    Td(""),
-                    Td(f"{breakdown['vat_amount']:.2f}")
-                ),
-                Tr(
-                    Td(Strong("Total")),
-                    Td(""),
-                    Td(""),
-                    Td(Strong(f"{breakdown['total']:.2f}"))
+                Tbody(
+                    Tr(
+                        Td("Tier 1 (0-15 kWh)"),
+                        Td(f"{TIER_1}"),
+                        Td(f"{breakdown['tier1_units']:.2f}"),
+                        Td(f"{breakdown['tier1_cost']:.2f}")
+                    ) if breakdown['tier1_units'] > 0 else None,
+                    Tr(
+                        Td("Tier 2 (15-35 kWh)"),
+                        Td(f"{TIER_2}"),
+                        Td(f"{breakdown['tier2_units']:.2f}"),
+                        Td(f"{breakdown['tier2_cost']:.2f}")
+                    ) if breakdown['tier2_units'] > 0 else None,
+                    Tr(
+                        Td("Tier 3 (35+ kWh)"),
+                        Td(f"{TIER_3}"),
+                        Td(f"{breakdown['tier3_units']:.2f}"),
+                        Td(f"{breakdown['tier3_cost']:.2f}")
+                    ) if breakdown['tier3_units'] > 0 else None,
+                    Tr(
+                        Td(Strong("Subtotal")),
+                        Td(""),
+                        Td(""),
+                        Td(Strong(f"{breakdown['subtotal']:.2f}"))
+                    ),
+                    Tr(
+                        Td(f"VAT ({VAT*100}%)"),
+                        Td(""),
+                        Td(""),
+                        Td(f"{breakdown['vat_amount']:.2f}")
+                    ),
+                    Tr(
+                        Td(Strong("Total")),
+                        Td(""),
+                        Td(""),
+                        Td(Strong(f"{breakdown['total']:.2f}"))
+                    )
                 )
             )
         )
-    )
+    ]
+    
+    # Add initial payment breakdown if applicable
+    if 'initial_amount' in breakdown and breakdown['initial_amount'] > 0:
+        table_content.append(
+            Article(
+                H4("Payment Summary"),
+                Table(
+                    Tbody(
+                        Tr(
+                            Td("Total Cost:"),
+                            Td(Strong(f"{breakdown['total']:.2f} RWF"))
+                        ),
+                        Tr(
+                            Td("Initial Payment:"),
+                            Td(f"- {breakdown['initial_amount']:.2f} RWF")
+                        ),
+                        Tr(
+                            Td(Strong("Remaining to Pay:")),
+                            Td(Strong(f"{breakdown['remaining_amount']:.2f} RWF"))
+                        )
+                    )
+                )
+            )
+        )
+    
+    return Div(*table_content)
 
 @rt('/')
 def get():
     return Title('Rwanda Electricity Calculator'), Main(
         Header(
             H1('Rwanda Energy Group Calculator'),
-            P('Calculate electricity costs and units with detailed tier breakdown')
+            P('Calculate electricity costs and units with detailed tier breakdown'),
+            P(A('View Official REG Tariffs', href='https://www.reg.rw/customer-service/tariffs/', target='_blank'))
         ),
         
         Section(
-            H2('Calculate Cost from Units'),
+            H2('Calculate Units from Cost'),
             Form(
-                Label('Enter units (kWh):', For='units-input'),
-                Input(
-                    type='number', 
-                    id='units-input',
-                    name='units', 
-                    placeholder='0.00', 
-                    min='0', 
-                    step='0.01',
-                    hx_get='/calculate-cost-live',
-                    hx_trigger='input changed delay:300ms',
-                    hx_target='#cost-result',
-                    hx_include='this'
-                ),
-                Small('Enter the number of kilowatt-hours (kWh) consumed')
+                Div(
+                    Label('Enter amount (RWF):', For='amount-input'),
+                    Input(
+                        type='number', 
+                        id='amount-input',
+                        name='amount', 
+                        placeholder='0.00', 
+                        min='0', 
+                        step='0.01',
+                        hx_get='/calculate-units-live',
+                        hx_trigger='input changed delay:300ms',
+                        hx_target='#units-result',
+                        hx_include='this',
+                        style='max-width: 300px;'
+                    ),
+                    Small('Enter the total amount in Rwandan Francs (RWF)')
+                )
             ),
-            Div(id='cost-result', cls='result-container')
+            Div(id='units-result', cls='result-container')
         ),
         
         Hr(),
         
         Section(
-            H2('Calculate Units from Cost'),
+            H2('Calculate Cost from Units'),
             Form(
-                Label('Enter amount (RWF):', For='amount-input'),
-                Input(
-                    type='number', 
-                    id='amount-input',
-                    name='amount', 
-                    placeholder='0.00', 
-                    min='0', 
-                    step='0.01',
-                    hx_get='/calculate-units-live',
-                    hx_trigger='input changed delay:300ms',
-                    hx_target='#units-result',
-                    hx_include='this'
+                Div(
+                    Label('Enter units (kWh):', For='units-input'),
+                    Input(
+                        type='number', 
+                        id='units-input',
+                        name='units', 
+                        placeholder='0.00', 
+                        min='0', 
+                        step='0.01',
+                        hx_get='/calculate-cost-live',
+                        hx_trigger='input changed delay:300ms',
+                        hx_target='#cost-result',
+                        hx_include='this',
+                        style='max-width: 300px;'
+                    ),
+                    Small('Enter the number of kilowatt-hours (kWh) consumed')
                 ),
-                Small('Enter the total amount in Rwandan Francs (RWF)')
+                Div(
+                    Label('Initial payment already made (optional):', For='initial-input'),
+                    Input(
+                        type='number', 
+                        id='initial-input',
+                        name='initial', 
+                        placeholder='0.00', 
+                        min='0', 
+                        step='0.01',
+                        hx_get='/calculate-cost-live',
+                        hx_trigger='input changed delay:300ms',
+                        hx_target='#cost-result',
+                        hx_include='#units-input, this',
+                        style='max-width: 300px;'
+                    ),
+                    Small('Enter any amount already paid at the beginning of the month')
+                )
             ),
-            Div(id='units-result', cls='result-container')
+            Div(id='cost-result', cls='result-container')
         ),
         
         Style("""
@@ -221,31 +280,41 @@ def get():
                 padding: 0.5rem;
                 border-radius: var(--border-radius);
             }
+            
+            form > div {
+                margin-bottom: 1rem;
+            }
         """)
     )
 
 @rt('/calculate-cost-live')
-def get(units: str = ""):
+def get(units: str = "", initial: str = ""):
     if not units or units == "":
         return Div()
     
     try:
         units_val = float(units)
+        initial_val = float(initial) if initial and initial != "" else 0
+        
         if units_val == 0:
             return Div()
             
-        result, breakdown = calculateAmountFromUnits(units_val)
+        result, breakdown = calculateAmountFromUnits(units_val, initial_val)
+        
+        result_text = f"{units_val} kWh = {result} RWF"
+        if initial_val > 0:
+            result_text += f" (Remaining: {breakdown['remaining_amount']} RWF)"
         
         return Div(
             Div(
                 H3("Result"),
-                P(f"{units_val} kWh = {result} RWF", cls='highlight'),
+                P(result_text, cls='highlight'),
                 cls='result-summary'
             ),
             create_breakdown_table(breakdown)
         )
     except (ValueError, TypeError) as e:
-        return Div(P(f"Invalid input: Please enter a valid number", cls='error'))
+        return Div(P(f"Invalid input: Please enter valid numbers", cls='error'))
 
 @rt('/calculate-units-live')
 def get(amount: str = ""):
