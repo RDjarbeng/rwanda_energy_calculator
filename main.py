@@ -5,12 +5,10 @@ VAT = 0.18
 TIER_1, TIER_2, TIER_3 = 89, 212, 249
 TIER_1_LIMIT, TIER_2_LIMIT = 15, 35
 
-def calculateAmountFromUnits(units: float, initial_amount: float = 0) -> tuple[float, dict]:
+def calculateAmountFromUnits(units: float) -> tuple[float, dict]:
     """Calculate amount and return detailed breakdown"""
     if units < 0:
         raise ValueError("Units cannot be negative")
-    if initial_amount < 0:
-        raise ValueError("Initial amount cannot be negative")
     
     # Calculate tier usage
     t1 = units if units <= TIER_1_LIMIT else TIER_1_LIMIT
@@ -25,9 +23,6 @@ def calculateAmountFromUnits(units: float, initial_amount: float = 0) -> tuple[f
     vat_amount = subtotal * VAT
     total = subtotal + vat_amount
     
-    # Calculate remaining amount after initial payment
-    remaining_amount = max(0, total - initial_amount)
-    
     breakdown = {
         'tier1_units': t1,
         'tier2_units': t2,
@@ -37,20 +32,23 @@ def calculateAmountFromUnits(units: float, initial_amount: float = 0) -> tuple[f
         'tier3_cost': t3_cost,
         'subtotal': subtotal,
         'vat_amount': vat_amount,
-        'total': round(total, 2),
-        'initial_amount': initial_amount,
-        'remaining_amount': round(remaining_amount, 2)
+        'total': round(total, 2)
     }
     
     return round(total, 2), breakdown
 
-def calculateUnitsFromAmount(amount: float) -> tuple[float, dict]:
+def calculateUnitsFromAmount(amount: float, initial_amount: float = 0) -> tuple[float, dict]:
     """Calculate units and return detailed breakdown"""
     if amount < 0:
         raise ValueError("Amount cannot be negative")
+    if initial_amount < 0:
+        raise ValueError("Initial amount cannot be negative")
+    
+    # Add initial amount to total available
+    total_available = amount + initial_amount
     
     # Remove VAT first to get subtotal
-    subtotal = amount / (1 + VAT)
+    subtotal = total_available / (1 + VAT)
     
     TIER_1_COST_LIMIT = TIER_1_LIMIT * TIER_1
     TIER_2_COST_LIMIT = TIER_1_COST_LIMIT + (TIER_2_LIMIT - TIER_1_LIMIT) * TIER_2
@@ -88,7 +86,9 @@ def calculateUnitsFromAmount(amount: float) -> tuple[float, dict]:
         'tier3_cost': round(t3_cost, 2),
         'subtotal': round(calc_subtotal, 2),
         'vat_amount': round(vat_amount, 2),
-        'total': amount
+        'total': round(total_available, 2),
+        'initial_amount': initial_amount,
+        'new_amount': amount
     }
     
     return round(units, 2), breakdown
@@ -152,7 +152,7 @@ def create_breakdown_table(breakdown: dict, is_from_units: bool = True):
         )
     ]
     
-    # Add initial payment breakdown if applicable
+    # Add payment breakdown if applicable (for units from amount with initial payment)
     if 'initial_amount' in breakdown and breakdown['initial_amount'] > 0:
         table_content.append(
             Article(
@@ -160,16 +160,16 @@ def create_breakdown_table(breakdown: dict, is_from_units: bool = True):
                 Table(
                     Tbody(
                         Tr(
-                            Td("Total Cost:"),
-                            Td(Strong(f"{breakdown['total']:.2f} RWF"))
-                        ),
-                        Tr(
                             Td("Initial Payment:"),
-                            Td(f"- {breakdown['initial_amount']:.2f} RWF")
+                            Td(f"{breakdown['initial_amount']:.2f} RWF")
                         ),
                         Tr(
-                            Td(Strong("Remaining to Pay:")),
-                            Td(Strong(f"{breakdown['remaining_amount']:.2f} RWF"))
+                            Td("New Payment:"),
+                            Td(f"{breakdown['new_amount']:.2f} RWF")
+                        ),
+                        Tr(
+                            Td(Strong("Total Available:")),
+                            Td(Strong(f"{breakdown['total']:.2f} RWF"))
                         )
                     )
                 )
@@ -202,10 +202,27 @@ def get():
                         hx_get='/calculate-units-live',
                         hx_trigger='input changed delay:300ms',
                         hx_target='#units-result',
-                        hx_include='this',
+                        hx_include='this, #initial-amount-input',
                         style='max-width: 300px;'
                     ),
-                    Small('Enter the total amount in Rwandan Francs (RWF)')
+                    Small('Enter the amount you want to spend on electricity')
+                ),
+                Div(
+                    Label('Initial payment already made (optional):', For='initial-amount-input'),
+                    Input(
+                        type='number', 
+                        id='initial-amount-input',
+                        name='initial_amount', 
+                        placeholder='0.00', 
+                        min='0', 
+                        step='0.01',
+                        hx_get='/calculate-units-live',
+                        hx_trigger='input changed delay:300ms',
+                        hx_target='#units-result',
+                        hx_include='#amount-input, this',
+                        style='max-width: 300px;'
+                    ),
+                    Small('Enter any amount already paid at the beginning of the month')
                 )
             ),
             Div(id='units-result', cls='result-container')
@@ -232,23 +249,6 @@ def get():
                         style='max-width: 300px;'
                     ),
                     Small('Enter the number of kilowatt-hours (kWh) consumed')
-                ),
-                Div(
-                    Label('Initial payment already made (optional):', For='initial-input'),
-                    Input(
-                        type='number', 
-                        id='initial-input',
-                        name='initial', 
-                        placeholder='0.00', 
-                        min='0', 
-                        step='0.01',
-                        hx_get='/calculate-cost-live',
-                        hx_trigger='input changed delay:300ms',
-                        hx_target='#cost-result',
-                        hx_include='#units-input, this',
-                        style='max-width: 300px;'
-                    ),
-                    Small('Enter any amount already paid at the beginning of the month')
                 )
             ),
             Div(id='cost-result', cls='result-container')
@@ -288,22 +288,48 @@ def get():
     )
 
 @rt('/calculate-cost-live')
-def get(units: str = "", initial: str = ""):
+def get(units: str = ""):
     if not units or units == "":
         return Div()
     
     try:
         units_val = float(units)
-        initial_val = float(initial) if initial and initial != "" else 0
         
         if units_val == 0:
             return Div()
             
-        result, breakdown = calculateAmountFromUnits(units_val, initial_val)
+        result, breakdown = calculateAmountFromUnits(units_val)
         
-        result_text = f"{units_val} kWh = {result} RWF"
+        return Div(
+            Div(
+                H3("Result"),
+                P(f"{units_val} kWh = {result} RWF", cls='highlight'),
+                cls='result-summary'
+            ),
+            create_breakdown_table(breakdown)
+        )
+    except (ValueError, TypeError) as e:
+        return Div(P(f"Invalid input: Please enter a valid number", cls='error'))
+
+@rt('/calculate-units-live')
+def get(amount: str = "", initial_amount: str = ""):
+    if not amount or amount == "":
+        return Div()
+    
+    try:
+        amount_val = float(amount)
+        initial_val = float(initial_amount) if initial_amount and initial_amount != "" else 0
+        
+        if amount_val == 0:
+            return Div()
+            
+        result, breakdown = calculateUnitsFromAmount(amount_val, initial_val)
+        
+        result_text = f"{result} kWh"
         if initial_val > 0:
-            result_text += f" (Remaining: {breakdown['remaining_amount']} RWF)"
+            result_text += f" (Total: {breakdown['total']} RWF = {initial_val} + {amount_val})"
+        else:
+            result_text += f" = {amount_val} RWF"
         
         return Div(
             Div(
@@ -311,33 +337,10 @@ def get(units: str = "", initial: str = ""):
                 P(result_text, cls='highlight'),
                 cls='result-summary'
             ),
-            create_breakdown_table(breakdown)
-        )
-    except (ValueError, TypeError) as e:
-        return Div(P(f"Invalid input: Please enter valid numbers", cls='error'))
-
-@rt('/calculate-units-live')
-def get(amount: str = ""):
-    if not amount or amount == "":
-        return Div()
-    
-    try:
-        amount_val = float(amount)
-        if amount_val == 0:
-            return Div()
-            
-        result, breakdown = calculateUnitsFromAmount(amount_val)
-        
-        return Div(
-            Div(
-                H3("Result"),
-                P(f"{amount_val} RWF = {result} kWh", cls='highlight'),
-                cls='result-summary'
-            ),
             create_breakdown_table(breakdown, False)
         )
     except (ValueError, TypeError) as e:
-        return Div(P(f"Invalid input: Please enter a valid number", cls='error'))
+        return Div(P(f"Invalid input: Please enter valid numbers", cls='error'))
 
 if __name__ == '__main__':
     serve()
