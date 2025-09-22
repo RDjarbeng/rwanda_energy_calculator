@@ -322,6 +322,69 @@ def create_dual_breakdown_table(breakdown: dict):
         )
     )
     
+    if breakdown['new_breakdown'] and breakdown['new_amount'] > 0:
+        new = breakdown['new_breakdown']
+        tables.append(
+            Article(
+                H4("New Payment Tier Breakdown"),
+                Table(
+                    Thead(
+                        Tr(
+                            Th("Tier"),
+                            Th("Rate (RWF/kWh)"),
+                            Th("Units Added"),
+                            Th("Cost (RWF)")
+                        )
+                    ),
+                    Tbody(
+                        Tr(
+                            Td("Tier 1 (0-20 kWh)"),
+                            Td(f"{TIER_1}"),
+                            Td(f"{new['tier1_units']:.2f}"),
+                            Td(f"{new['tier1_cost']:.2f}")
+                        ) if new['tier1_units'] > 0 else None,
+                        Tr(
+                            Td("Tier 2 (20-50 kWh)"),
+                            Td(f"{TIER_2}"),
+                            Td(f"{new['tier2_units']:.2f}"),
+                            Td(f"{new['tier2_cost']:.2f}")
+                        ) if new['tier2_units'] > 0 else None,
+                        Tr(
+                            Td("Tier 3 (50+ kWh)"),
+                            Td(f"{TIER_3}"),
+                            Td(f"{new['tier3_units']:.2f}"),
+                            Td(f"{new['tier3_cost']:.2f}")
+                        ) if new['tier3_units'] > 0 else None,
+                        Tr(
+                            Td(Strong("Subtotal (Units)")),
+                            Td(""),
+                            Td(Strong(f"{new['total_units']:.2f} kWh")),
+                            Td("")
+                        ),
+                        Tr(
+                            Td(Strong("Subtotal (Cost)")),
+                            Td(""),
+                            Td(""),
+                            Td(Strong(f"{new['subtotal']:.2f}"))
+                        ),
+                        Tr(
+                            Td(f"VAT ({VAT*100}%)"),
+                            Td(""),
+                            Td(""),
+                            Td(f"{new['vat_amount']:.2f}")
+                        ),
+                        Tr(
+                            Td(Strong("Total")),
+                            Td(""),
+                            Td(""),
+                            Td(Strong(f"{new['total']:.2f}"))
+                        )
+                    )
+                )
+            )
+        )
+    
+
     # Initial Payment Breakdown
     if breakdown['initial_breakdown'] and breakdown['initial_amount'] > 0:
         initial = breakdown['initial_breakdown']
@@ -386,67 +449,6 @@ def create_dual_breakdown_table(breakdown: dict):
         )
     
     # New Payment Breakdown
-    if breakdown['new_breakdown'] and breakdown['new_amount'] > 0:
-        new = breakdown['new_breakdown']
-        tables.append(
-            Article(
-                H4("New Payment Tier Breakdown"),
-                Table(
-                    Thead(
-                        Tr(
-                            Th("Tier"),
-                            Th("Rate (RWF/kWh)"),
-                            Th("Units Added"),
-                            Th("Cost (RWF)")
-                        )
-                    ),
-                    Tbody(
-                        Tr(
-                            Td("Tier 1 (0-20 kWh)"),
-                            Td(f"{TIER_1}"),
-                            Td(f"{new['tier1_units']:.2f}"),
-                            Td(f"{new['tier1_cost']:.2f}")
-                        ) if new['tier1_units'] > 0 else None,
-                        Tr(
-                            Td("Tier 2 (20-50 kWh)"),
-                            Td(f"{TIER_2}"),
-                            Td(f"{new['tier2_units']:.2f}"),
-                            Td(f"{new['tier2_cost']:.2f}")
-                        ) if new['tier2_units'] > 0 else None,
-                        Tr(
-                            Td("Tier 3 (50+ kWh)"),
-                            Td(f"{TIER_3}"),
-                            Td(f"{new['tier3_units']:.2f}"),
-                            Td(f"{new['tier3_cost']:.2f}")
-                        ) if new['tier3_units'] > 0 else None,
-                        Tr(
-                            Td(Strong("Subtotal (Units)")),
-                            Td(""),
-                            Td(Strong(f"{new['total_units']:.2f} kWh")),
-                            Td("")
-                        ),
-                        Tr(
-                            Td(Strong("Subtotal (Cost)")),
-                            Td(""),
-                            Td(""),
-                            Td(Strong(f"{new['subtotal']:.2f}"))
-                        ),
-                        Tr(
-                            Td(f"VAT ({VAT*100}%)"),
-                            Td(""),
-                            Td(""),
-                            Td(f"{new['vat_amount']:.2f}")
-                        ),
-                        Tr(
-                            Td(Strong("Total")),
-                            Td(""),
-                            Td(""),
-                            Td(Strong(f"{new['total']:.2f}"))
-                        )
-                    )
-                )
-            )
-        )
     
     # Combined Total Breakdown
     tables.append(
