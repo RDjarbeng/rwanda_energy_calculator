@@ -96,7 +96,8 @@ netlify/functions/app.py # Netlify function for serverless deployment
 requirements.txt         # Python dependencies (if present)
 dist/                    # Output directory for static HTML
 ```
-
+## Announcement
+Link to announcement by [RURA on change to energy tariffs on Richard's blog](https://rdjarbeng.com/rura-announces-revised-electricity-end-user-tariffs-effective-october-2025/)
 ## License
 
 This project is open source. See the LICENSE file for details.
