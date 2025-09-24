@@ -563,32 +563,32 @@ def get():
             P('Calculate electricity costs and units with detailed tier breakdown'),
             P(A('View Official REG Tariffs', href='https://www.reg.rw/customer-service/tariffs/', target='_blank')),
             
-            # Tariff Toggle
+            # Tariff Toggle - FIXED
             Article(
                 H4("Tariff Selection"),
                 Div(
                     Label(
                         Input(
                             type='radio', 
-                            name='tariff-type',
+                            name='tariff_type',  # Changed from 'tariff-type'
                             value='new',
                             checked=True,
                             hx_get='/update-tariff',
                             hx_trigger='change',
                             hx_target='#units-result, #cost-result',
-                            hx_include='#amount-input, #initial-amount-input, #units-input, input[name="tariff-type"]:checked'
+                            hx_include='#amount-input, #initial-amount-input, #units-input, input[name="tariff_type"]:checked'
                         ),
                         f" {NEW_TARIFFS['description']} (Current)"
                     ),
                     Label(
                         Input(
                             type='radio', 
-                            name='tariff-type',
+                            name='tariff_type',  # Changed from 'tariff-type'
                             value='old',
                             hx_get='/update-tariff',
                             hx_trigger='change',
                             hx_target='#units-result, #cost-result',
-                            hx_include='#amount-input, #initial-amount-input, #units-input, input[name="tariff-type"]:checked'
+                            hx_include='#amount-input, #initial-amount-input, #units-input, input[name="tariff_type"]:checked'
                         ),
                         f" {OLD_TARIFFS['description']}"
                     ),
@@ -616,7 +616,7 @@ def get():
                                 hx_get='/calculate-units-live',
                                 hx_trigger='input changed delay:300ms',
                                 hx_target='#units-result',
-                                hx_include='this, #initial-amount-input, input[name="tariff-type"]:checked',
+                                hx_include='this, #initial-amount-input, input[name="tariff_type"]:checked',  # Updated
                                 style='max-width: 300px;'
                             ),
                             Small('Enter the amount you want to spend on electricity')
@@ -633,7 +633,7 @@ def get():
                                 hx_get='/calculate-units-live',
                                 hx_trigger='input changed delay:300ms',
                                 hx_target='#units-result',
-                                hx_include='#amount-input, this, input[name="tariff-type"]:checked',
+                                hx_include='#amount-input, this, input[name="tariff_type"]:checked',  # Updated
                                 style='max-width: 300px;'
                             ),
                             Small('Enter any amount already paid at the beginning of the month')
@@ -657,7 +657,7 @@ def get():
                                     hx_get='/calculate-cost-live',
                                     hx_trigger='input changed delay:300ms',
                                     hx_target='#cost-result',
-                                    hx_include='this, input[name="tariff-type"]:checked',
+                                    hx_include='this, input[name="tariff_type"]:checked',  # Updated
                                     style='max-width: 300px;'
                                 ),
                                 Small('Enter the number of kilowatt-hours (kWh) consumed')
@@ -676,6 +676,7 @@ def get():
             ),
             cls='main-container'
         ),
+        
         
         Style("""
             /* Tariff selector styling */
@@ -786,9 +787,7 @@ def get():
     )
 
 @rt('/calculate-cost-live')
-def get(units: str = "", **kwargs):
-    tariff_type = kwargs.get('tariff-type', 'new')
-    
+def get(units: str = "", tariff_type: str = "new", **kwargs):
     if not units or units == "":
         return Div()
     
@@ -815,9 +814,7 @@ def get(units: str = "", **kwargs):
         return Div(P(f"Invalid input: Please enter a valid number", cls='error'))
 
 @rt('/calculate-units-live')
-def get(amount: str = "", initial_amount: str = "", **kwargs):
-    tariff_type = kwargs.get('tariff-type', 'new')
-    
+def get(amount: str = "", initial_amount: str = "", tariff_type: str = "new", **kwargs):
     # Show calculation even if only initial_amount is provided
     if (not amount or amount == "") and (not initial_amount or initial_amount == ""):
         return Div()
@@ -858,22 +855,21 @@ def get(amount: str = "", initial_amount: str = "", **kwargs):
         return Div(P(f"Invalid input: Please enter valid numbers", cls='error'))
 
 @rt('/update-tariff')
-def get(**kwargs):
-    tariff_type = kwargs.get('tariff-type', 'new')
-    units = kwargs.get('units', '')
-    amount = kwargs.get('amount', '')
-    initial_amount = kwargs.get('initial_amount', '')
+def get(tariff_type: str = "new", amount: str = "", initial_amount: str = "", units: str = "", **kwargs):
+    """Handle tariff type changes and recalculate results"""
+    results = []
     
-    # Units calculation content (first for #units-result)
-    units_content = Div()
-    if amount or initial_amount:
+    # Recalculate units result if amount inputs have values
+    if (amount and amount != "") or (initial_amount and initial_amount != ""):
         try:
             amount_val = float(amount) if amount and amount != "" else 0
             initial_val = float(initial_amount) if initial_amount and initial_amount != "" else 0
+            
             if amount_val > 0 or initial_val > 0:
                 result, breakdown = calculateUnitsFromAmount(amount_val, initial_val, tariff_type)
                 tariff_desc = NEW_TARIFFS['description'] if tariff_type == 'new' else OLD_TARIFFS['description']
                 
+                # Create result text based on what was entered
                 if initial_val > 0 and amount_val > 0:
                     result_text = f"{result} kWh (Total: {breakdown['total']} RWF = {initial_val} + {amount_val})"
                     title = "Units Calculation Result"
@@ -884,40 +880,47 @@ def get(**kwargs):
                     result_text = f"{result} kWh = {amount_val} RWF"
                     title = "Units Calculation Result"
                 
-                units_content = Div(
+                units_result = Div(
                     Div(
                         H3(title),
                         P(result_text, cls='highlight'),
                         Small(f"Using {tariff_desc}", style='color: var(--muted-color);'),
                         cls='result-summary'
                     ),
-                    create_breakdown_table(breakdown, False)
+                    create_breakdown_table(breakdown, False),
+                    id='units-result'
                 )
+                results.append(units_result)
         except (ValueError, TypeError):
-            pass
+            results.append(Div(P("Invalid amount input", cls='error'), id='units-result'))
+    else:
+        results.append(Div(id='units-result'))
     
-    # Cost calculation content (second for #cost-result)
-    cost_content = Div()
+    # Recalculate cost result if units input has value
     if units and units != "":
         try:
             units_val = float(units)
+            
             if units_val > 0:
                 result, breakdown = calculateAmountFromUnits(units_val, tariff_type)
                 tariff_desc = NEW_TARIFFS['description'] if tariff_type == 'new' else OLD_TARIFFS['description']
                 
-                cost_content = Div(
+                cost_result = Div(
                     Div(
                         H3("Cost Calculation Result"),
                         P(f"{units_val} kWh = {result} RWF", cls='highlight'),
                         Small(f"Using {tariff_desc}", style='color: var(--muted-color);'),
                         cls='result-summary'
                     ),
-                    create_breakdown_table(breakdown)
+                    create_breakdown_table(breakdown),
+                    id='cost-result'
                 )
+                results.append(cost_result)
         except (ValueError, TypeError):
-            pass
+            results.append(Div(P("Invalid units input", cls='error'), id='cost-result'))
+    else:
+        results.append(Div(id='cost-result'))
     
-    return units_content, cost_content
-
+    return Div(*results)
 if __name__ == '__main__':
     serve()
