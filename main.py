@@ -558,7 +558,16 @@ def create_dual_breakdown_table(breakdown: dict):
 
 @rt('/')
 def get():
-    return Title('Rwanda Electricity Calculator'), Main(
+    return Title('Rwanda Electricity Calculator'),Head(
+            # Favicon links for various devices/browsers
+            Link(rel="icon", href="/static/favicon.ico", type="image/x-icon"),  # Default ICO
+            Link(rel="icon", type="image/png", sizes="16x16", href="/static/favicon-16x16.png"),
+            Link(rel="icon", type="image/png", sizes="32x32", href="/static/favicon-32x32.png"),
+            Link(rel="apple-touch-icon", sizes="180x180", href="/static/apple-touch-icon.png"),  # iOS Safari
+            Link(rel="icon", type="image/png", sizes="192x192", href="/static/android-chrome-192x192.png"),  # Android Chrome
+            Link(rel="icon", type="image/png", sizes="512x512", href="/static/android-chrome-512x512.png"),  # Android Chrome (high-res)
+            Link(rel="manifest", href="/static/site.webmanifest"),  # Web App Manifest for PWA
+        ),Main(
         Header(
             H1('Rwanda Energy Group Calculator'),
             P('Calculate electricity costs and units with detailed tier breakdown'),
