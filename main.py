@@ -1,4 +1,5 @@
 from fasthtml.common import *
+from starlette.staticfiles import StaticFiles
 
 # Constants
 VAT = 0.18
@@ -562,6 +563,7 @@ def get():
             H1('Rwanda Energy Group Calculator'),
             P('Calculate electricity costs and units with detailed tier breakdown'),
             P(A('View Official REG Tariffs', href='https://www.reg.rw/customer-service/tariffs/', target='_blank')),
+            P(A('See this announcement for new tariffs', href='https://rdjarbeng.com/rura-announces-revised-electricity-end-user-tariffs-effective-october-2025/', target='_blank')),
             
             # Tariff Toggle - FIXED
             Article(
