@@ -3,6 +3,7 @@
 A web application for calculating electricity costs and units according to Rwanda Energy Group (REG) tariffs, with a detailed breakdown by tier.
 
 Built with FastHTML. App is deployed with Onrender [here](https://rwanda-energy-calculator.onrender.com/)
+<img width="1281" height="627" alt="image" src="https://github.com/user-attachments/assets/2e7625cd-ddf1-42a5-bb3c-a484edb88b1b" />
 
 ## Features
 
