@@ -105,6 +105,7 @@ This project is open source. See the LICENSE file for details.
 ## Author
 
 Created by [RDjarbeng](https://github.com/RDjarbeng)
+Initial programming logic by [Ian Akotey](https://github.com/ianakotey)
 
 ---
 
